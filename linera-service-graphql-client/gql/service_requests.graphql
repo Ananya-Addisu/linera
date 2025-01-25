@@ -1,0 +1,355 @@
+query Chains {
+  chains {
+    list
+    default
+  }
+}
+
+query ChainOutbox($chainId: ChainId!, $target: Target!) {
+  chain(chainId: $chainId) {
+    outboxes {
+      entry(key: $target) {
+        key
+        value {
+          nextHeightToSchedule
+          queue {
+            entries
+          }
+        }
+      }
+    }
+  }
+}
+
+query ChainChannel($chainId: ChainId!, $channelFullName: ChannelFullName!) {
+  chain(chainId: $chainId) {
+    channels {
+      entry(key: $channelFullName) {
+        key
+        value {
+          subscribers
+          blockHeights {
+            entries
+          }
+        }
+      }
+    }
+  }
+}
+
+query ChainInbox($chainId: ChainId!, $origin: Origin!) {
+  chain(chainId: $chainId) {
+    inboxes {
+      entry(key: $origin) {
+        key
+        value {
+          nextCursorToAdd {
+            height
+            index
+          }
+          nextCursorToRemove {
+            height
+            index
+          }
+          addedBundles {
+            entries {
+              height
+              timestamp
+              certificateHash
+              transactionIndex
+              messages {
+                authenticatedSigner
+                grant
+                refundGrantTo
+                kind
+                index
+                message
+              }
+            }
+          }
+          removedBundles {
+            entries {
+              height
+              timestamp
+              certificateHash
+              transactionIndex
+              messages {
+                authenticatedSigner
+                grant
+                refundGrantTo
+                kind
+                index
+                message
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+query Chain(
+  $chainId: ChainId!,
+  $inboxesInput: MapInput_Origin_742d451b,
+  $outboxesInput: MapInput_Target_7aac1e1c,
+  $channelsInput: MapInput_ChannelFullName_3b59bf69,
+) {
+  chain(chainId: $chainId) {
+    chainId
+    executionState {
+      system {
+        description
+        epoch
+        adminId
+        subscriptions {
+          chainId
+          name
+        }
+        ownership
+        balance
+        timestamp
+      }
+    }
+    executionStateHash
+    tipState {
+      blockHash
+      nextBlockHeight
+    }
+    manager {
+      ownership
+      seed
+      lockedBlobs {
+        keys
+      }
+      roundTimeout
+      fallbackOwners
+      currentRound
+    }
+    confirmedLog {
+      entries
+    }
+    receivedLog {
+      entries {
+        chainId
+        height
+      }
+    }
+    inboxes {
+      keys
+      entries(input: $inboxesInput) {
+        key
+        value {
+          nextCursorToAdd {
+            height
+            index
+          }
+          nextCursorToRemove {
+            height
+            index
+          }
+          addedBundles {
+            entries {
+              height
+              timestamp
+              certificateHash
+              transactionIndex
+              messages {
+                authenticatedSigner
+                grant
+                refundGrantTo
+                kind
+                index
+                message
+              }
+            }
+          }
+          removedBundles {
+            entries {
+              height
+              timestamp
+              certificateHash
+              transactionIndex
+              messages {
+                authenticatedSigner
+                grant
+                refundGrantTo
+                kind
+                index
+                message
+              }
+            }
+          }
+        }
+      }
+    }
+    outboxes {
+      keys
+      entries(input: $outboxesInput) {
+        key
+        value {
+          nextHeightToSchedule
+          queue {
+            entries
+          }
+        }
+      }
+    }
+    outboxCounters
+    channels {
+      keys
+      entries(input: $channelsInput) {
+        key
+        value {
+          subscribers
+          blockHeights {
+            entries
+          }
+        }
+      }
+    }
+
+  }
+}
+
+query Applications($chainId: ChainId!) {
+  applications(chainId: $chainId) {
+    id
+    link
+    description
+  }
+}
+
+query Block($hash: CryptoHash, $chainId: ChainId!) {
+  block(hash: $hash, chainId: $chainId) {
+    hash
+    value {
+      status
+      block {
+        header {
+          chainId
+          epoch
+          height
+          timestamp
+          stateHash
+          previousBlockHash
+          authenticatedSigner
+          bundlesHash
+          operationsHash
+          messagesHash
+          oracleResponsesHash
+          eventsHash
+        }
+        body {
+          incomingBundles {
+            origin
+            bundle {
+              height
+              timestamp
+              certificateHash
+              transactionIndex
+              messages {
+                authenticatedSigner
+                grant
+                refundGrantTo
+                kind
+                index
+                message
+              }
+            }
+            action
+          }
+          operations
+          messages {
+            destination
+            authenticatedSigner
+            grant
+            refundGrantTo
+            kind
+            message
+          }
+          oracleResponses
+          events {
+            streamId {
+              applicationId
+              streamName
+            }
+            key
+            value
+          }
+        }
+      }
+    }
+  }
+}
+
+query Blocks($from: CryptoHash, $chainId: ChainId!, $limit: Int) {
+  blocks(from: $from, chainId: $chainId, limit: $limit) {
+    hash
+    value {
+      status
+      block {
+        header {
+          chainId
+          epoch
+          height
+          timestamp
+          stateHash
+          previousBlockHash
+          authenticatedSigner
+          bundlesHash
+          operationsHash
+          messagesHash
+          oracleResponsesHash
+          eventsHash
+        }
+        body {
+          incomingBundles {
+            origin
+            bundle {
+              height
+              timestamp
+              certificateHash
+              transactionIndex
+              messages {
+                authenticatedSigner
+                grant
+                refundGrantTo
+                kind
+                index
+                message
+              }
+            }
+            action
+          }
+          operations
+          messages {
+            destination
+            authenticatedSigner
+            grant
+            refundGrantTo
+            kind
+            message
+          }
+          oracleResponses
+          events {
+            streamId {
+              applicationId
+              streamName
+            }
+            key
+            value
+          }
+        }
+      }
+    }
+  }
+}
+
+subscription Notifications($chainId: ChainId!) {
+  notifications(chainId: $chainId)
+}
+
+mutation Transfer($chainId: ChainId!, $recipient: ChainId!, $amount: Amount!) {
+  transfer(chainId: $chainId, recipient: { Account: { chain_id: $recipient } }, amount: $amount)
+}

@@ -1,0 +1,95 @@
+[package]
+name = "linera-rpc"
+description = "RPC schemas and networking library for the Linera protocol."
+readme = "README.md"
+documentation = "https://docs.rs/linera-rpc/latest/linera_rpc/"
+
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+repository.workspace = true
+version.workspace = true
+
+[features]
+test = [
+    "linera-base/test",
+    "linera-chain/test",
+    "linera-core/test",
+    "linera-execution/test",
+    "linera-storage/test",
+]
+
+metrics = [
+    "prometheus",
+    "linera-base/metrics",
+    "linera-chain/metrics",
+    "linera-core/metrics",
+    "linera-execution/metrics",
+    "linera-storage/metrics",
+]
+
+server = ["tokio-util", "tonic-health", "tonic-reflection"]
+simple-network = ["tokio-util/net"]
+
+web = [
+    "linera-base/web",
+    "linera-chain/web",
+    "linera-core/web",
+    "linera-execution/web",
+]
+
+web-default = ["web"]
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+bincode.workspace = true
+bytes.workspace = true
+cfg-if.workspace = true
+clap.workspace = true
+dashmap.workspace = true
+ed25519-dalek.workspace = true
+futures.workspace = true
+linera-base.workspace = true
+linera-chain.workspace = true
+linera-core.workspace = true
+linera-execution.workspace = true
+linera-storage.workspace = true
+linera-version.workspace = true
+prometheus = { workspace = true, optional = true }
+prost.workspace = true
+rand.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util = { workspace = true, optional = true, features = ["codec"] }
+tonic-health = { workspace = true, optional = true }
+tonic-reflection = { workspace = true, optional = true }
+tower.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+insta = { workspace = true, features = ["yaml"] }
+linera-rpc = { path = ".", default-features = false, features = ["test"] }
+proptest.workspace = true
+serde-reflection.workspace = true
+test-strategy.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tonic = { workspace = true, features = ["tls", "tls-webpki-roots", "prost", "codegen", "transport"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+tonic = { workspace = true, features = ["codegen", "prost"] }
+tonic-web-wasm-client.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test.workspace = true
+
+[build-dependencies]
+cfg_aliases.workspace = true
+rcgen.workspace = true
+tonic-build = { workspace = true, features = ["prost"] }
+
+[package.metadata.cargo-machete]
+ignored = ["prost"]

@@ -1,0 +1,373 @@
+syntax = "proto3";
+package rpc.v1;
+
+import "google/protobuf/empty.proto";
+
+// A service run by the Proxy which listens for incoming connections
+// from workers and then notifies clients.
+service NotifierService {
+  // Notify a client that there has been an update for a `ChainId`.
+  rpc Notify(Notification) returns (google.protobuf.Empty);
+}
+
+// Interface provided by each physical shard (aka "worker") of a validator or a local node.
+// * All commands return either the current chain info or an error.
+// * Repeating commands produces no changes and returns no error.
+// * Some handlers may return cross-chain requests, that is, messages
+//   to be communicated to other workers of the same validator.
+service ValidatorWorker {
+  // Propose a new block.
+  rpc HandleBlockProposal(BlockProposal) returns (ChainInfoResult);
+
+  // Process a certificate without value.
+  rpc HandleLiteCertificate(LiteCertificate) returns (ChainInfoResult);
+
+  rpc HandleConfirmedCertificate(HandleConfirmedCertificateRequest) returns (ChainInfoResult);
+
+  rpc HandleValidatedCertificate(HandleValidatedCertificateRequest) returns (ChainInfoResult);
+
+  rpc HandleTimeoutCertificate(HandleTimeoutCertificateRequest) returns (ChainInfoResult);
+
+  // Handle information queries for this chain.
+  rpc HandleChainInfoQuery(ChainInfoQuery) returns (ChainInfoResult);
+
+  // Download a blob that belongs to a pending block on the given chain.
+  rpc DownloadPendingBlob(PendingBlobRequest) returns (PendingBlobResult);
+
+  // Handle a blob that belongs to a pending block on the given chain.
+  rpc HandlePendingBlob(HandlePendingBlobRequest) returns (ChainInfoResult);
+
+  // Handle a (trusted!) cross-chain request.
+  rpc HandleCrossChainRequest(CrossChainRequest) returns (google.protobuf.Empty);
+}
+
+// How to communicate with a validator or a local node.
+service ValidatorNode {
+  // Propose a new block.
+  rpc HandleBlockProposal(BlockProposal) returns (ChainInfoResult);
+
+  // Process a certificate without value.
+  rpc HandleLiteCertificate(LiteCertificate) returns (ChainInfoResult);
+
+  rpc HandleConfirmedCertificate(HandleConfirmedCertificateRequest) returns (ChainInfoResult);
+
+  rpc HandleValidatedCertificate(HandleValidatedCertificateRequest) returns (ChainInfoResult);
+
+  rpc HandleTimeoutCertificate(HandleTimeoutCertificateRequest) returns (ChainInfoResult);
+
+  // Handle information queries for this chain.
+  rpc HandleChainInfoQuery(ChainInfoQuery) returns (ChainInfoResult);
+
+  // Subscribe to notifications for a set of Chain Ids.
+  rpc Subscribe(SubscriptionRequest) returns (stream Notification);
+
+  // Request the node's version info.
+  rpc GetVersionInfo(google.protobuf.Empty) returns (VersionInfo);
+
+  // Request the genesis configuration hash of the network this node is part of.
+  rpc GetGenesisConfigHash(google.protobuf.Empty) returns (CryptoHash);
+
+  // Download a blob.
+  rpc DownloadBlob(BlobId) returns (BlobContent);
+
+  // Download a blob that belongs to a pending block on the given chain.
+  rpc DownloadPendingBlob(PendingBlobRequest) returns (PendingBlobResult);
+
+  // Handle a blob that belongs to a pending block on the given chain.
+  rpc HandlePendingBlob(HandlePendingBlobRequest) returns (ChainInfoResult);
+
+  // Upload a blob. Returns an error if the validator has not seen a
+  // certificate using this blob.
+  rpc UploadBlob(BlobContent) returns (BlobId);
+
+  // Download a certificate.
+  rpc DownloadCertificate(CryptoHash) returns (Certificate);
+
+  // Download a batch of certificates.
+  rpc DownloadCertificates(CertificatesBatchRequest) returns (CertificatesBatchResponse);
+
+  // Return the hash of the `Certificate` that last used a blob.
+  rpc BlobLastUsedBy(BlobId) returns (CryptoHash);
+
+  // Return the `BlobId`s that are not contained as `Blob`.
+  rpc MissingBlobIds(BlobIds) returns (BlobIds);
+}
+
+// A request for a batch of certificates.
+message CertificatesBatchRequest {
+  repeated CryptoHash hashes = 1;
+}
+
+// A batch of certificates.
+message CertificatesBatchResponse {
+  repeated Certificate certificates = 1;
+}
+
+// Information about the Linera crate version the validator is running
+message CrateVersion {
+    uint32 major = 1;
+    uint32 minor = 2;
+    uint32 patch = 3;
+}
+
+// Information about the version of Linera the validator is running
+message VersionInfo {
+    CrateVersion crate_version = 1;
+    string git_commit = 2;
+    bool git_dirty = 3;
+    string rpc_hash = 4;
+    string graphql_hash = 5;
+    string wit_hash = 6;
+}
+
+// A request for client to subscribe to notifications for a given `ChainId`
+message SubscriptionRequest {
+  repeated ChainId chain_ids = 1;
+}
+
+// Notify that a chain has a new certified block or a new message.
+message Notification {
+  ChainId chain_id = 1;
+  bytes reason = 2;
+}
+
+// A wrapper around ChainInfoResponse which contains a serialized error variant
+message ChainInfoResult {
+  oneof inner {
+    ChainInfoResponse chain_info_response = 1;
+    // a bincode wrapper around `NodeError`
+    bytes error = 2;
+  }
+}
+
+// An internal request between chains within a validator.
+message CrossChainRequest {
+  oneof inner {
+    UpdateRecipient update_recipient = 1;
+    ConfirmUpdatedRecipient confirm_updated_recipient = 2;
+  }
+}
+
+// Communicate a number of messages from the sender to the recipient.
+// Messages must be given by increasing block height.
+message UpdateRecipient {
+  ChainId sender = 1;
+  ChainId recipient = 2;
+  bytes bundle_vecs = 3;
+}
+
+// Acknowledge the height of the highest confirmed blocks communicated with `UpdateRecipient`.
+message ConfirmUpdatedRecipient {
+  ChainId sender = 1;
+  ChainId recipient = 2;
+  bytes latest_heights = 3;
+}
+
+// Request information on a chain.
+message ChainInfoQuery {
+  // The chain ID
+  ChainId chain_id = 1;
+
+  // Optionally test that the block height is as expected
+  optional BlockHeight test_next_block_height = 2;
+
+  // Query the current committees
+  bool request_committees = 3;
+
+  // Query the received messages that are waiting be picked in the next block.
+  bool request_pending_message_bundles = 4;
+
+  // Query a range of certificates hashes sent from the chain.
+  optional bytes request_sent_certificate_hashes_in_range = 5;
+
+  // Query new certificate removed from the chain.
+  optional uint64 request_received_log_excluding_first_n = 6;
+
+  // Query values from the chain manager, not just votes.
+  bool request_manager_values = 7;
+
+  // Request a signed vote for a leader timeout.
+  bool request_leader_timeout = 8;
+
+  // Query the balance of a given owner.
+  optional AccountOwner request_owner_balance = 9;
+
+  // Request a signed vote for fallback mode.
+  bool request_fallback = 10;
+}
+
+// An authenticated proposal for a new block.
+message BlockProposal {
+  // The ID of the chain (used for routing).
+  ChainId chain_id = 1;
+
+  // bincode-encoded content
+  bytes content = 2;
+
+  // Byte-encoded public key
+  PublicKey public_key = 3;
+
+  // Byte-encoded owner
+  Owner owner = 4;
+
+  // Signature value
+  Signature signature = 5;
+
+  // A lite certificate for a validated block that justifies the proposal in this round.
+  optional bytes validated_block_certificate = 6;
+
+  // Required blob
+  bytes blobs = 7;
+}
+
+// A certified statement from the committee, without the value.
+message LiteCertificate {
+  // The ID of the chain the value belongs to.
+  ChainId chain_id = 1;
+
+  // The certified value's hash
+  bytes hash = 2;
+
+  // The round in which the value was certified.
+  bytes round = 3;
+
+  // Signatures on the value hash and round
+  bytes signatures = 4;
+
+  // Wait until all outgoing cross-chain messages from this certificate have
+  // been received by the target chains.
+  bool wait_for_outgoing_messages = 5;
+
+  CertificateKind kind = 6;
+}
+
+// A certified statement from the committee, together with other certificates
+// required for execution.
+message HandleTimeoutCertificateRequest {
+  // The ID of the chain (used for routing).
+  ChainId chain_id = 1;
+
+  // A certified statement from the committee.
+  Certificate certificate = 4;
+}
+
+// A certified statement from the committee, together with other certificates
+// required for execution.
+message HandleValidatedCertificateRequest {
+  // The ID of the chain (used for routing).
+  ChainId chain_id = 1;
+
+  // A certified statement from the committee.
+  Certificate certificate = 2;
+}
+
+// A certified statement from the committee, together with other certificates
+// required for execution.
+message HandleConfirmedCertificateRequest {
+  // The ID of the chain (used for routing).
+  ChainId chain_id = 1;
+
+  // A certified statement from the committee.
+  Certificate certificate = 2;
+
+  // Wait until all outgoing cross-chain messages from this certificate have
+  // been received by the target chains.
+  bool wait_for_outgoing_messages = 3;
+}
+
+// A request for a pending blob.
+message PendingBlobRequest {
+  ChainId chain_id = 1;
+  BlobId blob_id = 2;
+}
+
+// A requested pending blob, or an error.
+message PendingBlobResult {
+  oneof inner {
+    BlobContent blob = 1;
+    // a bincode wrapper around `NodeError`
+    bytes error = 2;
+  }
+}
+
+// A request to handle a pending blob.
+message HandlePendingBlobRequest {
+  ChainId chain_id = 1;
+  BlobContent blob = 2;
+}
+
+// A certified statement from the committee.
+message Certificate {
+  // The certified value
+  bytes value = 1;
+
+  // The round in which the value was certified.
+  bytes round = 2;
+
+  // Signatures on the value hash and round
+  bytes signatures = 3;
+
+  // The kind of certificate serialized in `value` field.
+  CertificateKind kind = 4;
+}
+
+enum CertificateKind {
+  // Certificate for a timeout vote.
+  Timeout = 0;
+  // Certificate for a validated block.
+  Validated = 1;
+  // Certificate for a confirmed block.
+  Confirmed = 2;
+}
+
+message ChainId {
+  bytes bytes = 1;
+}
+
+message PublicKey {
+  bytes bytes = 1;
+}
+
+message CryptoHash {
+  bytes bytes = 1;
+}
+
+message AccountOwner {
+  bytes bytes = 1;
+}
+
+message Owner {
+  bytes bytes = 1;
+}
+
+message Signature {
+  bytes bytes = 1;
+}
+
+// A content-addressed blob ID i.e. the hash of the `BlobContent`.
+message BlobId {
+  bytes bytes = 1;
+}
+
+// Content-addressed blob IDs i.e. the hashes of the `BlobContent`s.
+message BlobIds {
+  repeated bytes bytes = 1;
+}
+
+// A blob of binary data.
+message BlobContent {
+  bytes bytes = 1;
+}
+
+// Response to `ChainInfoQuery`
+message ChainInfoResponse {
+  // bincode-encoded chain info
+  bytes chain_info = 1;
+
+  // Optional signature for the response.
+  optional Signature signature = 2;
+}
+
+message BlockHeight {
+  uint64 height = 1;
+}
